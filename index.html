@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Coding Challenge for Splunk</title>
+<link rel="stylesheet" type="text/css" href="jqplot/jquery.jqplot.min.css" />
+<style>
+body {
+	margin: 20px;
+}
+#chart-sales {
+	height:400px;
+	width:600px;
+	margin-top: 20px;
+}
+</style>
+
+</head>
+<body>
+<select id="select-chart">
+  <option value="bar">Bar Chart</option>
+  <option value="stackedBar">Bar Chart Stacked</option>
+  <option value="line">Line Chart</option>
+  </select>
+<select id="select-report">
+  <option value="flowersSold">Quantity Sold</option>
+  <option value="flowersUnsold">Quantity Unsold</option>
+</select>
+<div id="chart-sales"></div>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script language="javascript" type="text/javascript" src="jqplot/jquery.jqplot.min.js"></script>
+<script type="text/javascript" src="jqplot/plugins/jqplot.barRenderer.min.js"></script>
+<script type="text/javascript" src="jqplot/plugins/jqplot.categoryAxisRenderer.min.js"></script>
+<script type="text/javascript" src="jqplot/plugins/jqplot.pointLabels.min.js"></script>
+<script type="text/javascript" src="jqplot/plugins/jqplot.highlighter.min.js"></script>
+<script>
+var rawData = [
+	{"flower": "tulip", "date": "2/3/2012", "quantity-sold": "20", "quantity-unsold": "10"},
+	{"flower": "tulip", "date": "2/4/2012", "quantity-sold": "18", "quantity-unsold": "12"},
+	{"flower": "tulip", "date": "2/5/2012", "quantity-sold": "23", "quantity-unsold": "7"},
+	{"flower": "tulip", "date": "2/6/2012", "quantity-sold": "15", "quantity-unsold": "20"},
+	{"flower": "tulip", "date": "2/7/2012", "quantity-sold": "12", "quantity-unsold": "23"},
+	{"flower": "rose", "date": "2/3/2012", "quantity-sold": "50", "quantity-unsold": "40"},
+	{"flower": "rose", "date": "2/4/2012", "quantity-sold": "43", "quantity-unsold": "47"},
+	{"flower": "rose", "date": "2/5/2012", "quantity-sold": "55", "quantity-unsold": "35"},
+	{"flower": "rose", "date": "2/6/2012", "quantity-sold": "70", "quantity-unsold": "20"},
+	{"flower": "rose", "date": "2/7/2012", "quantity-sold": "30", "quantity-unsold": "70"},
+	{"flower": "dandelion", "date": "2/3/2012", "quantity-sold": "10", "quantity-unsold": "0"},
+	{"flower": "dandelion", "date": "2/4/2012", "quantity-sold": "9", "quantity-unsold": "11"},
+	{"flower": "dandelion", "date": "2/5/2012", "quantity-sold": "3", "quantity-unsold": "17"},
+	{"flower": "dandelion", "date": "2/6/2012", "quantity-sold": "4", "quantity-unsold": "16"},
+	{"flower": "dandelion", "date": "2/7/2012", "quantity-sold": "7", "quantity-unsold": "8"}
+];
+
+// function for converting data to a format suitable for jqplot library
+var convertData = function(data) {
+	var mData = {
+		"flowers" : [],
+		"dates" : [],
+		"flowersSold" : [],
+		"flowersUnsold" : []
+	};
+	for (var i=0; i< data.length; i++) {
+		var curItem = data[i];
+		var curFlower = curItem["flower"];
+		var curDate = curItem["date"];
+		var curSold = parseInt(curItem["quantity-sold"]);
+		var curUnsold = parseInt(curItem["quantity-unsold"]);
+		var curFlowerIndex = mData["flowers"].indexOf(curFlower);
+		var curDateIndex = mData["dates"].indexOf(curDate);
+		/* for this exercise we assume the sales data for each flower is sorted by date as in sample Data */
+		if (curDateIndex == -1) {
+			mData["dates"].push(curDate);
+		}
+		if (curFlowerIndex > -1) {
+			mData["flowersSold"][curFlowerIndex].push(curSold);
+			mData["flowersUnsold"][curFlowerIndex].push(curUnsold);
+		} else {
+			// create a new series and add current sales data
+			mData["flowers"].push(curFlower);
+			mData["flowersSold"].push([curSold]);
+			mData["flowersUnsold"].push([curUnsold]);
+		};
+	};
+	return mData;
+};
+
+var Chart = function() {
+	// default options for all charts
+	this.chartOptions = {
+		animateReplot: false,
+		cursor: {
+			show: true,
+			zoom: true,
+			looseZoom: true,
+			showTooltip: false
+		},
+		highlighter: {
+			show: true,
+			sizeAdjust: 1,
+			tooltipOffset: 9
+		},
+		grid: {
+			background: 'rgba(57,57,57,0.0)',
+			drawBorder: false,
+			shadow: false,
+			gridLineColor: '#f0f0f0',
+			gridLineWidth: 1
+		},
+		legend: {
+			show: true,
+			placement: 'outside'
+		},
+		series: [],
+		axesDefaults: {
+			rendererOptions: {
+				baselineWidth: 1.5,
+				baselineColor: '#444444',
+				drawBaseline: false
+			}
+		},
+		axes:{
+			xaxis:{
+				label: '',
+				pad: 1,
+				renderer: $.jqplot.CategoryAxisRenderer,
+				ticks: [],
+				tickOptions: {
+					formatString: '%b %e',
+				}		
+			},
+			yaxis:{
+				label: '',
+				rendererOptions: {
+					forceTickAt0: true
+				}
+			}
+		}		
+	};
+};
+
+Chart.prototype.draw = function(options) {
+	var container = options.container;
+	var data = options.data[options.reportCateg];
+	
+	//set chart options
+	this.chartOptions.axes.xaxis.label = options.labelX;
+	this.chartOptions.axes.yaxis.label = options.labelY;
+	if (options.type == 'line') { // line chart
+		this.chartOptions.seriesDefaults = {
+			pointLabels: { 
+				show: false 
+			},
+			rendererOptions: {
+				smooth: true,
+				animation: {
+					show: false
+				}
+			},
+			showMarker: false
+		};
+	} else { // bar chart
+		this.chartOptions.seriesDefaults = {
+			renderer:$.jqplot.BarRenderer,
+			showHighlight: false,
+			pointLabels: { 
+				show: true 
+			},
+			rendererOptions: {
+				smooth: true,
+				animation: {
+					show: false
+				},
+				barWidth: 25,
+				barPadding: 1,
+				barMargin: 1
+			},
+			showMarker: true
+		};
+	};
+	this.chartOptions.stackSeries = (options.type == 'stackedBar');
+	//reset and create series labels in chart options
+	this.chartOptions.series = [];
+	var flowers = options.data.flowers;
+	for (var i=0; i<flowers.length; i++) {
+		this.chartOptions.series.push({"label": flowers[i]});
+	}
+	this.chartOptions.axes.xaxis.ticks = options.data["dates"];
+	this.chartOptions.title = options.title;
+	// plot the chart
+	if (this.plot) {
+		this.plot.destroy();
+	};
+	this.plot = $.jqplot(container, data, this.chartOptions);
+};
+
+$(document).ready(function(){
+	var modData = convertData(rawData);
+	chart = new Chart();
+	var options = {
+		title: 'Flowers Sales Report : ' + $("#select-report option:selected").text(),
+		container: 'chart-sales',
+		type: $("#select-chart").val(), // bar | stackedBar | line
+		data: modData,
+		reportCateg: $("#select-report").val(),
+		labelX: 'Date',
+		labelY: $("#select-report option:selected").text()
+	};
+	chart.draw(options);
+	$("#select-chart").on('change', function() {
+		options.type = $(this).val();
+		chart.draw(options);
+	});
+	$("#select-report").on('change', function() {
+		options.reportCateg = $(this).val();
+		var reportLabel = $("option:selected", this).text();
+		options.labelY = reportLabel;
+		options.title = 'Flowers Sales Report : ' + reportLabel;
+		chart.draw(options);
+	});
+});
+</script>
+</body>
+</html>
